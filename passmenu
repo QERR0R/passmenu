@@ -64,7 +64,7 @@ main() {
                 current_path="$dir_name"
                 ;;
             *)
-                password_output=$( PINENTRY_USER_DATA="REQUEST_TYPE=menu" pass show "$selection" 2>/dev/null)
+                password_output=$( pass show "$selection" 2>/dev/null)
                 
                 if [ -n "$password_output" ]; then
                     selected_line=$(echo "$password_output" | dmenu -i -l 20 -p "Select to copy: $selection")
