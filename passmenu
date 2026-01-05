@@ -1,0 +1,84 @@
+#!/bin/sh
+
+
+PASSWORD_STORE_DIR="${PASSWORD_STORE_DIR:-$HOME/.password-store}"
+
+show_pass_menu() {
+    local path="$1"
+    
+    if [ -n "$path" ]; then
+        echo ".."
+    fi
+    
+    find "$PASSWORD_STORE_DIR/$path" -maxdepth 1 -type f -name "*.gpg" 2>/dev/null | \
+        sed "s|$PASSWORD_STORE_DIR/||; s|\.gpg$||" | sort
+    
+    find "$PASSWORD_STORE_DIR/$path" -maxdepth 1 -type d ! -path "$PASSWORD_STORE_DIR/$path" 2>/dev/null | \
+        sed "s|$PASSWORD_STORE_DIR/||; s|/$||" | \
+        while read -r dir; do
+            echo "$dir/"
+        done | sort
+}
+
+copy_to_clipboard() {
+    local value="$1"
+    
+    if command -v xclip >/dev/null 2>&1; then
+        echo "$value" | xclip -selection clipboard
+        echo "Copied to clipboard (xclip)" | dmenu -p "Success"
+    elif command -v xsel >/dev/null 2>&1; then
+        echo "$value" | xsel --clipboard
+        echo "Copied to clipboard (xsel)" | dmenu -p "Success"
+    elif command -v wl-copy >/dev/null 2>&1; then
+        echo "$value" | wl-copy
+        echo "Copied to clipboard (wl-copy)" | dmenu -p "Success"
+    elif command -v pbcopy >/dev/null 2>&1; then
+        echo "$value" | pbcopy
+        echo "Copied to clipboard (pbcopy)" | dmenu -p "Success"
+    else
+        echo "No clipboard utility found" | dmenu -p "Error"
+    fi
+}
+
+main() {
+    current_path=""
+    
+    while true; do
+        selection=$(show_pass_menu "$current_path" | dmenu -i -l 20 -p "pass $current_path")
+        
+        if [ -z "$selection" ]; then
+            exit 0
+        fi
+        
+        if [ "$selection" = ".." ]; then
+            current_path=$(dirname "$current_path" 2>/dev/null)
+            if [ "$current_path" = "." ]; then
+                current_path=""
+            fi
+            continue
+        fi
+        
+        case "$selection" in
+            */)
+                dir_name="${selection%/}"
+                current_path="$dir_name"
+                ;;
+            *)
+                password_output=$(pass show "$selection" 2>/dev/null)
+                
+                if [ -n "$password_output" ]; then
+                    selected_line=$(echo "$password_output" | dmenu -i -l 20 -p "Select to copy: $selection")
+                    
+                    if [ -n "$selected_line" ]; then
+                        copy_to_clipboard "$selected_line"
+                    fi
+                else
+                    echo "Password not found or error" | dmenu -p "Error: $selection"
+                fi
+                exit 0
+                ;;
+        esac
+    done
+}
+
+main
